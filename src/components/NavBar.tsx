@@ -11,7 +11,7 @@ export const NavBar: React.FC<NavBarProps> = ({}) => {
     const [{ data }] = useMeQuery({ pause: isServer() });
 
     return (
-        <Flex bg="tan" p={4}>
+        <Flex bg="tan" p={4} zIndex={1} position="sticky" top={0}>
             <Box ml={"auto"}>
                 {data?.me ? (
                     <Flex>
