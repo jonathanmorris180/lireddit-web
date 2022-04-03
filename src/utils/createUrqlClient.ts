@@ -1,5 +1,11 @@
-import { dedupExchange, fetchExchange, Exchange } from "urql";
-import { cacheExchange } from "@urql/exchange-graphcache";
+import {
+    dedupExchange,
+    fetchExchange,
+    Exchange,
+    stringifyVariables
+} from "urql";
+import { gql } from "@urql/core";
+import { cacheExchange, Resolver } from "@urql/exchange-graphcache";
 import {
     LogoutMutation,
     MeQuery,
@@ -10,6 +16,128 @@ import {
 import { pipe, tap } from "wonka";
 import { betterUpdateQuery } from "./betterUpdateQuery";
 import router from "next/router";
+
+export const cursorPagination = (): Resolver => {
+    /*     const compareArgs = (
+        fieldArgs: Variables,
+        connectionArgs: Variables
+    ): boolean => {
+        for (const key in connectionArgs) {
+            if (key === cursorArgument || key === limitArgument) {
+                continue;
+            } else if (!(key in fieldArgs)) {
+                return false;
+            }
+
+            const argA = fieldArgs[key];
+            const argB = connectionArgs[key];
+
+            if (
+                typeof argA !== typeof argB || typeof argA !== "object"
+                    ? argA !== argB
+                    : stringifyVariables(argA) !== stringifyVariables(argB)
+            ) {
+                return false;
+            }
+        }
+
+        for (const key in fieldArgs) {
+            if (key === cursorArgument || key === limitArgument) {
+                continue;
+            }
+            if (!(key in connectionArgs)) return false;
+        }
+
+        return true;
+    }; */
+
+    return (_parent, fieldArgs, cache, info) => {
+        const { parentKey: entityKey, fieldName } = info;
+
+        const allFields = cache.inspectFields(entityKey);
+        const fieldInfos = allFields.filter(
+            info => info.fieldName === fieldName
+        );
+        const size = fieldInfos.length;
+        if (size === 0) {
+            return undefined;
+        }
+        const fieldKey = `${fieldName}(${stringifyVariables(fieldArgs)})`;
+
+        const isInCache = cache.resolve(
+            cache.resolve(entityKey, fieldKey) as string,
+            "posts"
+        );
+        info.partial = !isInCache;
+        let hasMore = true;
+        const results: string[] = [];
+        fieldInfos.forEach(fi => {
+            const key = cache.resolve(entityKey, fi.fieldKey) as string;
+            const data = cache.resolve(key, "posts") as string[];
+            hasMore = cache.resolve(key, "hasMore") as boolean;
+
+            results.push(...data);
+        });
+
+        return {
+            __typename: "PaginatedPosts",
+            hasMore,
+            posts: results
+        };
+
+        /* const visited = new Set();
+        let result: NullArray<string> = [];
+        let prevOffset: number | null = null;
+
+        for (let i = 0; i < size; i++) {
+            const { fieldKey, arguments: args } = fieldInfos[i];
+            if (args === null || !compareArgs(fieldArgs, args)) {
+                continue;
+            }
+
+            const links = cache.resolve(entityKey, fieldKey) as string[];
+            const currentOffset = args[cursorArgument];
+
+            if (
+                links === null ||
+                links.length === 0 ||
+                typeof currentOffset !== "number"
+            ) {
+                continue;
+            }
+
+            const tempResult: NullArray<string> = [];
+
+            for (let j = 0; j < links.length; j++) {
+                const link = links[j];
+                if (visited.has(link)) continue;
+                tempResult.push(link);
+                visited.add(link);
+            }
+
+            if (
+                (!prevOffset || currentOffset > prevOffset) ===
+                (mergeMode === "after")
+            ) {
+                result = [...result, ...tempResult];
+            } else {
+                result = [...tempResult, ...result];
+            }
+
+            prevOffset = currentOffset;
+        }
+
+        const hasCurrentPage = cache.resolve(entityKey, fieldName, fieldArgs);
+        if (hasCurrentPage) {
+            return result;
+        } else if (!(info as any).store.schema) {
+            return undefined;
+        } else {
+            info.partial = true;
+            return result;
+        }*/
+    };
+};
 
 const errorExchange: Exchange =
     ({ forward }) =>
@@ -32,9 +160,52 @@ export const createUrqlClient = (ssrExchange: any) => ({
     exchanges: [
         dedupExchange,
         cacheExchange({
+            keys: {
+                PaginatedPosts: () => null
+            },
+            resolvers: {
+                Query: {
+                    posts: cursorPagination()
+                }
+            },
             updates: {
                 Mutation: {
-                    logout: (_result, args, cache, info) => {
+                    vote: (_result, args, cache, _2) => {
+                        const { postId, value } = args;
+                        const data = cache.readFragment(
+                            gql`
+                                fragment _ on Post {
+                                    id
+                                    points
+                                }
+                            `,
+                            { id: postId }
+                        );
+                        if (data) {
+                            const newPoints = data.points + value;
+                            cache.writeFragment(
+                                gql`
+                                    fragment _ on Post {
+                                        points
+                                    }
+                                `,
+                                { id: postId, points: newPoints }
+                            );
+                        }
+                    },
+                    createPost: (_result, _1, cache, _2) => {
+                        const allFields = cache.inspectFields("Query");
+                        console.log("allFields: ", allFields);
+                        const fieldInfos = allFields.filter(
+                            info => info.fieldName === "posts"
+                        );
+                        console.log("fieldInfos: ", fieldInfos);
+
+                        fieldInfos.forEach(fi => {
+                            cache.invalidate("Query", "posts", fi.arguments);
+                        });
+                    },
+                    logout: (_result, _1, cache, _2) => {
                         betterUpdateQuery<LogoutMutation, MeQuery>(
                             cache,
                             { query: MeDocument },
@@ -42,7 +213,7 @@ export const createUrqlClient = (ssrExchange: any) => ({
                             () => ({ me: null })
                         );
                     },
-                    login: (_result, args, cache, info) => {
+                    login: (_result, _1, cache, _2) => {
                         betterUpdateQuery<LoginMutation, MeQuery>(
                             cache,
                             {
@@ -60,7 +231,7 @@ export const createUrqlClient = (ssrExchange: any) => ({
                             }
                         );
                     },
-                    register: (_result, args, cache, info) => {
+                    register: (_result, _1, cache, _2) => {
                         betterUpdateQuery<RegisterMutation, MeQuery>(
                             cache,
                             {
