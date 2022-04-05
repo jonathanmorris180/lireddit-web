@@ -16,7 +16,7 @@ export const EditDeletePostButtons: React.FC<EditDeletePostButtonsProps> = ({
     const [{ data: meData }] = useMeQuery();
     const [, deletePost] = useDeletePostMutation();
 
-    if (meData?.me?.id !== creatorId) return null;
+    if (creatorId && meData?.me?.id !== creatorId) return null;
     return (
         <Box>
             <NextLink href="/post/edit/[id]" as={`/post/edit/${id}`}>

@@ -14,7 +14,7 @@ import { useState } from "react";
 import { EditDeletePostButtons } from "../components/EditDeletePostButtons";
 import { Layout } from "../components/Layout";
 import { UpdootSection } from "../components/UpdootSection";
-import { usePostsQuery } from "../generated/graphql";
+import { useMeQuery, usePostsQuery } from "../generated/graphql";
 import { createUrqlClient } from "../utils/createUrqlClient";
 
 const Index = () => {
@@ -25,6 +25,7 @@ const Index = () => {
     const [{ data, error, fetching }] = usePostsQuery({
         variables
     });
+    const [{ data: meData }] = useMeQuery();
 
     if (!fetching && !data) {
         return <div>Query failed. Error: {error?.message}</div>;
@@ -34,11 +35,11 @@ const Index = () => {
         <>
             {fetching && !data ? (
                 <div>Loading...</div>
-            ) : !fetching && !data ? null : (
-                <Layout variant="regular">
-                    <Stack spacing={8}>
-                        {data!.posts.posts.map(p =>
-                            !p ? null : (
+            ) : (
+                <div>
+                    <Layout variant="regular">
+                        <Stack spacing={8}>
+                            {data!.posts.posts.map(p => (
                                 <Flex
                                     key={p.id}
                                     p={5}
@@ -65,39 +66,43 @@ const Index = () => {
                                             <Text flex={1} mt={4}>
                                                 {p.textSnippet}
                                             </Text>
-                                            <Box ml="auto">
-                                                <EditDeletePostButtons
-                                                    id={p.id}
-                                                    creatorId={p.creator.id}
-                                                />
-                                            </Box>
+
+                                            {meData?.me?.id !==
+                                            p.creator.id ? null : (
+                                                <Box ml="auto">
+                                                    <EditDeletePostButtons
+                                                        id={p.id}
+                                                        creatorId={p.creator.id}
+                                                    />
+                                                </Box>
+                                            )}
                                         </Flex>
                                     </Flex>
                                 </Flex>
-                            )
-                        )}
-                    </Stack>
+                            ))}
+                        </Stack>
 
-                    {data && data.posts.hasMore ? (
-                        <Flex>
-                            <Button
-                                isLoading={fetching}
-                                m="auto"
-                                my={8}
-                                onClick={() => {
-                                    setVariables({
-                                        limit: variables.limit,
-                                        cursor: data.posts.posts[
-                                            data.posts.posts.length - 1
-                                        ].createdAt
-                                    });
-                                }}
-                            >
-                                Load More
-                            </Button>
-                        </Flex>
-                    ) : null}
-                </Layout>
+                        {data && data.posts.hasMore ? (
+                            <Flex>
+                                <Button
+                                    isLoading={fetching}
+                                    m="auto"
+                                    my={8}
+                                    onClick={() => {
+                                        setVariables({
+                                            limit: variables.limit,
+                                            cursor: data.posts.posts[
+                                                data.posts.posts.length - 1
+                                            ].createdAt
+                                        });
+                                    }}
+                                >
+                                    Load More
+                                </Button>
+                            </Flex>
+                        ) : null}
+                    </Layout>
+                </div>
             )}
         </>
     );

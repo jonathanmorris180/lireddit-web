@@ -10,6 +10,9 @@ export const NavBar: React.FC<NavBarProps> = ({}) => {
     const [{ fetching: logoutFetching }, logout] = useLogoutMutation();
     const [{ data }] = useMeQuery({ pause: isServer() });
 
+    console.log("NavBar useMeQuery result: ", JSON.stringify(data));
+    console.log("isServer: ", isServer());
+
     return (
         <Flex bg="tan" p={4} zIndex={1} position="sticky" top={0}>
             <Flex maxW={800} m="auto" align="center" flex={1}>

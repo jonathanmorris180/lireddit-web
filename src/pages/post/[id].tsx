@@ -9,6 +9,7 @@ const Post = ({}) => {
     const [{ data, error, fetching }] = useGetPostFromUrl();
 
     if (error) console.error(error.message);
+    console.log("data from [id]: ", JSON.stringify(data));
 
     if (fetching) {
         return (
