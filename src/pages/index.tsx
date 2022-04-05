@@ -110,4 +110,4 @@ const Index = () => {
 
 // withUrqlClient takes a function and an object - you can't pass in createUrqlClient() since that would pass the return
 // value of that function as the first parameter to withUrqlClient
-export default withUrqlClient(createUrqlClient, { ssr: true })(Index);
+export default Index;

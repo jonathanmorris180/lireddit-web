@@ -18,6 +18,8 @@ import { pipe, tap } from "wonka";
 import { betterUpdateQuery } from "./betterUpdateQuery";
 import router from "next/router";
 import { isServer } from "./isServer";
+import { SSRExchange } from "next-urql";
+import { NextPageContext } from "next";
 
 export const cursorPagination = (): Resolver => {
     /*     const compareArgs = (
@@ -163,14 +165,17 @@ function invalidateAllPosts(cache: Cache) {
     });
 }
 
-export const createUrqlClient = (ssrExchange: any, ctx: any) => {
+export const createUrqlClient = (
+    ssrExchange: SSRExchange,
+    ctx?: NextPageContext
+) => {
     let cookie;
     if (ctx && isServer()) {
-        cookie = ctx.req.headers.cookie;
+        cookie = ctx?.req?.headers.cookie;
     }
 
     return {
-        url: "http://localhost:4000/graphql",
+        url: process.env.NEXT_PUBLIC_API_URL as string,
         fetchOptions: {
             credentials: "include" as const,
             headers: cookie
