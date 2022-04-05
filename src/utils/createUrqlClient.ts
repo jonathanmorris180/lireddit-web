@@ -5,7 +5,7 @@ import {
     stringifyVariables
 } from "urql";
 import { gql } from "@urql/core";
-import { cacheExchange, Resolver } from "@urql/exchange-graphcache";
+import { cacheExchange, Resolver, Cache } from "@urql/exchange-graphcache";
 import {
     LogoutMutation,
     MeQuery,
@@ -154,6 +154,15 @@ const errorExchange: Exchange =
         );
     };
 
+function invalidateAllPosts(cache: Cache) {
+    const allFields = cache.inspectFields("Query");
+    const fieldInfos = allFields.filter(info => info.fieldName === "posts");
+
+    fieldInfos.forEach(fi => {
+        cache.invalidate("Query", "posts", fi.arguments);
+    });
+}
+
 export const createUrqlClient = (ssrExchange: any, ctx: any) => {
     let cookie;
     if (ctx && isServer()) {
@@ -225,18 +234,7 @@ export const createUrqlClient = (ssrExchange: any, ctx: any) => {
                             }
                         },
                         createPost: (_result, _1, cache, _2) => {
-                            const allFields = cache.inspectFields("Query");
-                            const fieldInfos = allFields.filter(
-                                info => info.fieldName === "posts"
-                            );
-
-                            fieldInfos.forEach(fi => {
-                                cache.invalidate(
-                                    "Query",
-                                    "posts",
-                                    fi.arguments
-                                );
-                            });
+                            invalidateAllPosts(cache);
                         },
                         logout: (_result, _1, cache, _2) => {
                             betterUpdateQuery<LogoutMutation, MeQuery>(
@@ -247,6 +245,7 @@ export const createUrqlClient = (ssrExchange: any, ctx: any) => {
                             );
                         },
                         login: (_result, _1, cache, _2) => {
+                            invalidateAllPosts(cache);
                             betterUpdateQuery<LoginMutation, MeQuery>(
                                 cache,
                                 {
