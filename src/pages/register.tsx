@@ -4,24 +4,33 @@ import { Wrapper } from "../components/Wrapper";
 import { InputField } from "../components/InputField";
 import { Box } from "@chakra-ui/layout";
 import { Button } from "@chakra-ui/button";
-import { useRegisterMutation } from "../generated/graphql";
+import { MeDocument, useRegisterMutation } from "../generated/graphql";
 import { toErrorMap } from "../utils/toErrorMap";
 import { useRouter } from "next/router";
-import { withUrqlClient } from "next-urql";
-import { createUrqlClient } from "../utils/createUrqlClient";
+import { withApollo } from "../utils/withApollo";
 
 interface RegisterProps {}
 
 export const Register: React.FC<RegisterProps> = ({}) => {
     const router = useRouter();
-    const [, register] = useRegisterMutation();
+    const [register] = useRegisterMutation();
     return (
         <Wrapper variant="small">
             <Formik
                 initialValues={{ email: "", username: "", password: "" }}
                 onSubmit={async (values, { setErrors }) => {
-                    const response = await register({ options: values });
-                    console.log("response: ", response);
+                    const response = await register({
+                        variables: { options: values },
+                        update: (cache, data) => {
+                            cache.writeQuery({
+                                query: MeDocument,
+                                data: {
+                                    __typename: "Query",
+                                    me: data.data?.register.user
+                                }
+                            });
+                        }
+                    });
                     if (response.data?.register.errors) {
                         setErrors(toErrorMap(response.data.register.errors));
                     } else if (response.data?.register.user) {
@@ -65,5 +74,4 @@ export const Register: React.FC<RegisterProps> = ({}) => {
         </Wrapper>
     );
 };
-
-export default withUrqlClient(createUrqlClient)(Register);
+export default withApollo({ ssr: false })(Register);
